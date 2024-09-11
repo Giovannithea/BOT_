@@ -6,7 +6,7 @@ const { PublicKey } = require('@solana/web3.js');
 const borsh = require('borsh');
 
 // MongoDB connection setup
-const MONGO_URI = 'mongodb+srv://joseseb400:CIeReeRiiSf74FOX@bot.2bwfk.mongodb.net/?retryWrites=true&w=majority&appName=BOT';
+const MONGO_URI = 'Input MongoDB URI';
 const client = new MongoClient(MONGO_URI);
 let db;
 
