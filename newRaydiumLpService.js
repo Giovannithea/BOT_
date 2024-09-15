@@ -1,12 +1,11 @@
-// newRaydiumLpService.js
 const { MongoClient } = require('mongodb');
 const bs58 = require('bs58');
 const { struct, u8, u64 } = require('@solana/buffer-layout');
-const { PublicKey } = require('@solana/web3.js');
+const { PublicKey, Connection } = require('@solana/web3.js'); // Importing PublicKey and Connection from Solana Web3.js
 const borsh = require('borsh');
 
 // MongoDB connection setup
-const MONGO_URI = 'Input MongoDB URI';
+const MONGO_URI = 'Input Your MongoDB URI Here';
 const client = new MongoClient(MONGO_URI);
 let db;
 
@@ -67,6 +66,13 @@ const removeLiquiditySchema = new Map([
     ]
 ]);
 
+// Function to convert little-endian hex to decimal
+function hexToDecimal(hex) {
+    const buffer = Buffer.from(hex, 'hex');
+    const decimal = buffer.readUIntLE(0, buffer.length);
+    return decimal;
+}
+
 // Decoding function for Add Liquidity
 function decodeAddLiquidityInstruction(data) {
     const buffer = Buffer.from(bs58.decode(data));
@@ -74,8 +80,8 @@ function decodeAddLiquidityInstruction(data) {
 
     console.log("Decoded Add Liquidity Instruction:");
     console.log(`Instruction: ${decoded.instruction}`);
-    console.log(`Base Amount In: ${decoded.baseAmountIn.toString()}`);
-    console.log(`Quote Amount In: ${decoded.quoteAmountIn.toString()}`);
+    console.log(`Base Amount In: ${hexToDecimal(decoded.baseAmountIn.toString('hex'))}`);
+    console.log(`Quote Amount In: ${hexToDecimal(decoded.quoteAmountIn.toString('hex'))}`);
     console.log(`Fixed Side: ${decoded.fixedSide === 0 ? 'Base' : 'Quote'}`);
 
     return decoded;
@@ -88,7 +94,7 @@ function decodeRemoveLiquidityInstruction(data) {
 
     console.log("Decoded Remove Liquidity Instruction:");
     console.log(`Instruction: ${decoded.instruction}`);
-    console.log(`Amount In: ${decoded.amountIn.toString()}`);
+    console.log(`Amount In: ${hexToDecimal(decoded.amountIn.toString('hex'))}`);
 
     return decoded;
 }
@@ -108,6 +114,12 @@ async function processRaydiumLpTransaction(connection, signature) {
             console.log("Transaction Message:", message);
             console.log("Accounts:", accounts);
 
+            if (accounts.length >= 7) {
+                const seventhAccount = accounts[6];
+                const balance = await connection.getBalance(new PublicKey(seventhAccount));
+                console.log(`Liquidity Pool Amount (In SOL) : ${balance / 1e9} `);
+            }
+
             if (Array.isArray(message.instructions)) {
                 for (const ix of message.instructions) {
                     const programId = message.staticAccountKeys[ix.programIdIndex].toString();
@@ -124,7 +136,7 @@ async function processRaydiumLpTransaction(connection, signature) {
 
                         console.log("Event Details:", eventDetails);
 
-                        await db.collection('Test1').insertOne(eventDetails);
+                        await db.collection('Input MongoDB Collection').insertOne(eventDetails);
                         console.log("Event inserted into MongoDB");
                         break;
                     }
@@ -138,7 +150,9 @@ async function processRaydiumLpTransaction(connection, signature) {
 
 // Decoding instruction data based on instruction type
 function decodeInstructionData(data) {
-    const instructionId = data[0];
+    const buffer = Buffer.from(bs58.decode(data));
+    const instructionId = buffer[0];
+
     if (instructionId === 3) {
         return decodeAddLiquidityInstruction(data);
     } else if (instructionId === 4) {
